@@ -1,8 +1,9 @@
+
 name: Daily Short
 
 on:
   schedule:
-    - cron: '37 12 * * *'
+    - cron: '37 12 * * *' # 18:07 IST (UTC 12:37)
   workflow_dispatch:
     inputs:
       action:
@@ -23,6 +24,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -32,20 +35,77 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg flite fonts-dejavu-core
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
 
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Render Short
+      - name: Configure Git
         run: |
-          python render.py 0
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine run mode & episode
+        id: prep
+        run: |
+          import json, os
+
+          action = "${{ github.event.inputs.action }}" or "preview"
+          if "${{ github.event_name }}" == "schedule":
+              daily_enabled = "${{ vars.DAILY_ENABLED }}"
+              if daily_enabled.lower() != "true":
+                  print("Daily schedule is disabled (DAILY_ENABLED != true). Exiting gracefully.")
+                  os.system('echo "skip=true" >> $GITHUB_OUTPUT')
+                  exit(0)
+              action = "upload"
+
+          with open("state.json", "r") as f:
+              state = json.load(f)
+
+          episode = state.get("next", 0)
+          print(f"Action: {action}, Episode: {episode}")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as gh_out:
+              gh_out.write(f"action={action}\n")
+              gh_out.write(f"episode={episode}\n")
+              gh_out.write("skip=false\n")
+        shell: python
+
+      - name: Reserve slot (Upload only)
+        if: steps.prep.outputs.skip != 'true' && steps.prep.outputs.action == 'upload'
+        env:
+          YT_AUTH: ${{ secrets.YT_AUTH }}
+          CHANNEL_ID: ${{ vars.CHANNEL_ID }}
+        run: |
+          python render.py ${{ steps.prep.outputs.episode }}
+          python upload.py reserve
+          git add state.json
+          git commit -m "Reserve episode ${{ steps.prep.outputs.episode }}"
+          git push
+
+      - name: Render Short (Preview only)
+        if: steps.prep.outputs.skip != 'true' && steps.prep.outputs.action == 'preview'
+        run: |
+          python render.py ${{ steps.prep.outputs.episode }}
+
+      - name: Upload to YouTube (Upload only)
+        if: steps.prep.outputs.skip != 'true' && steps.prep.outputs.action == 'upload'
+        env:
+          YT_AUTH: ${{ secrets.YT_AUTH }}
+          CHANNEL_ID: ${{ vars.CHANNEL_ID }}
+        run: |
+          python upload.py upload
+          git add state.json
+          git commit -m "Complete upload episode ${{ steps.prep.outputs.episode }}"
+          git push
 
       - name: Upload Artifact (Preview)
+        if: steps.prep.outputs.skip != 'true' && (steps.prep.outputs.action == 'preview' || failure())
         uses: actions/upload-artifact@v4
         with:
           name: shorts-preview
           path: output/
           retention-days: 7
+          
