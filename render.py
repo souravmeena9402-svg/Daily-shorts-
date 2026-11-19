@@ -53,7 +53,9 @@ with wave.open(str(out / 'voice.wav'), 'wb') as w:
 
 # 2. Invoke Blender 3D Headless Renderer
 print(f"Rendering 3D Scene in Blender ({total_frames} frames)...")
-raw_3d_video = out / 'raw_3d.mp4'
+frames_dir = out / 'frames'
+frames_dir.mkdir(exist_ok=True)
+frame_prefix = str(frames_dir / 'f_')
 
 blender_cmd = [
     'blender', '-b',
@@ -62,7 +64,7 @@ blender_cmd = [
     str(k),
     str(v),
     str(total_frames),
-    str(raw_3d_video)
+    frame_prefix
 ]
 sp.run(blender_cmd, check=True)
 
@@ -137,7 +139,8 @@ final_output = out / 'short.mp4'
 
 ffmpeg_composite = [
     'ffmpeg', '-loglevel', 'error', '-y',
-    '-i', str(raw_3d_video),
+    '-framerate', str(FPS),
+    '-i', str(frames_dir / 'f_%04d.png'),
     '-framerate', str(FPS),
     '-i', str(overlay_dir / 'overlay_%05d.png'),
     '-i', str(out / 'voice.wav'),
