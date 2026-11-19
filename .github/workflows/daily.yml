@@ -31,10 +31,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install system dependencies (Blender, EGL & FFmpeg)
+      - name: Install system dependencies (FFmpeg & Fonts)
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-dejavu-core blender libegl1 libgl1-mesa-dev libgl1-mesa-glx libosmesa6
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
 
       - name: Install Python dependencies
         run: |
@@ -84,7 +84,7 @@ jobs:
           git commit -m "Reserve episode ${{ steps.prep.outputs.episode }}"
           git push
 
-      - name: Render Short with 3D Blender (Preview only)
+      - name: Render 3D Perspective Short (Preview only)
         if: steps.prep.outputs.skip != 'true' && steps.prep.outputs.action == 'preview'
         run: |
           python render.py ${{ steps.prep.outputs.episode }}
