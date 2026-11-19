@@ -45,38 +45,16 @@ for j, (text, label) in enumerate(beats):
     audio.extend(bytes(2 * target - len(audio)))
     parts.append(frames)
 
-total_frames = sum(parts)
-
 with wave.open(str(out / 'voice.wav'), 'wb') as w:
     w.setparams((1, 2, rate, 0, 'NONE', ''))
     w.writeframes(audio)
 
-# 2. Invoke Blender 3D Headless Renderer
-print(f"Rendering 3D Scene in Blender ({total_frames} frames)...")
-frames_dir = out / 'frames'
-frames_dir.mkdir(exist_ok=True)
-frame_prefix = str(frames_dir / 'f_')
-
-blender_cmd = [
-    'blender', '-b',
-    '-P', 'render_3d.py',
-    '--',
-    str(k),
-    str(v),
-    str(total_frames),
-    frame_prefix
-]
-sp.run(blender_cmd, check=True)
-
-# 3. Generate Floating Cinematic UI Overlay Frames
-print("Generating UI Overlay...")
-overlay_dir = out / 'overlay'
-overlay_dir.mkdir(exist_ok=True)
-
+# Typography & Colors
 def get_font(sz, bold=False):
     candidates = [
         f'/usr/share/fonts/truetype/dejavu/DejaVuSans{"-Bold" if bold else ""}.ttf',
-        f'/usr/share/fonts/truetype/liberation/LiberationSans-{"Bold" if bold else "Regular"}.ttf'
+        f'/usr/share/fonts/truetype/liberation/LiberationSans-{"Bold" if bold else "Regular"}.ttf',
+        f'/usr/share/fonts/dejavu/DejaVuSans{"-Bold" if bold else ""}.ttf'
     ]
     for p in candidates:
         if os.path.exists(p):
@@ -87,6 +65,17 @@ badge_f = get_font(20, True)
 head_f = get_font(42, True)
 body_f = get_font(32, True)
 tag_f = get_font(22, True)
+math_f = get_font(26, True)
+
+C_BG = (12, 18, 32)
+C_CARD_BG = (20, 30, 52)
+C_CARD_BORDER = (45, 75, 125)
+C_CYAN = (0, 240, 255)
+C_MINT = (80, 250, 180)
+C_GOLD = (255, 200, 80)
+C_MAGENTA = (255, 60, 140)
+C_TEXT_WHITE = (245, 248, 255)
+C_TEXT_MUTED = (145, 170, 205)
 
 def wrap(d, text, f, w):
     lines = ['']
@@ -98,66 +87,181 @@ def wrap(d, text, f, w):
             lines[-1] = s
     return lines
 
+# Background Pre-render
+base_bg = Image.new('RGB', (W, H), C_BG)
+bd = ImageDraw.Draw(base_bg)
+for x in range(40, W, 48):
+    bd.line((x, 0, x, H), fill=(18, 28, 48), width=1)
+for y in range(40, H, 48):
+    bd.line((0, y, W, y), fill=(18, 28, 48), width=1)
+
+# Header
+bd.rounded_rectangle((48, 50, 215, 88), radius=18, fill=(25, 45, 80), outline=C_CYAN, width=1)
+bd.text((64, 57), "THOUGHT LAB", font=badge_f, fill=C_CYAN)
+bd.text((235, 57), f"•  EPISODE #{n+1:03}", font=tag_f, fill=C_TEXT_MUTED)
+
+for i, line in enumerate(wrap(bd, title, head_f, 620)):
+    bd.text((48, 118 + i * 50), line, font=head_f, fill=C_TEXT_WHITE)
+
+# 3D Center Stage (Card)
+STAGE_RECT = (40, 345, 680, 790)
+bd.rounded_rectangle(STAGE_RECT, radius=28, fill=C_CARD_BG, outline=C_CARD_BORDER, width=2)
+# Internal 3D Perspective Grid
+for i in range(-5, 6):
+    bd.line((360 + i * 28, 770, 360 + i * 65, 460), fill=(28, 44, 75), width=1)
+for y_g in [760, 720, 670, 610, 540, 470]:
+    bd.line((60, y_g, 660, y_g), fill=(28, 44, 75), width=1)
+
+# Real 3D Perspective Projection Engine (True 3D Math without heavy Blender)
+def project_3d(x, y, z, cx=360, cy=560, fov=450):
+    # Camera distance offset
+    dist = z + 500
+    if dist <= 10: dist = 10
+    scale = fov / dist
+    sx = int(cx + x * scale)
+    sy = int(cy + y * scale)
+    return sx, sy, scale
+
+def scene_3d(d, b, t):
+    p = (t % 4) / 4
+    
+    if k == 'orbit':
+        # 3D Star & Multi-Planet Orbit System
+        sx, sy, ss = project_3d(0, 0, 0)
+        # 3D Sun Glow
+        d.ellipse((sx-28, sy-28, sx+28, sy+28), fill=(255, 180, 30, 80))
+        d.ellipse((sx-18, sy-18, sx+18, sy+18), fill=C_GOLD)
+        
+        # 3D Orbit 1 (Cyan Planet)
+        orbit1_pts = []
+        for deg in range(0, 360, 10):
+            rad = m.radians(deg)
+            # Tilt orbit in 3D space
+            ox = 140 * m.cos(rad)
+            oy = 50 * m.sin(rad)
+            oz = 140 * m.sin(rad)
+            px, py, _ = project_3d(ox, oy, oz)
+            orbit1_pts.append((px, py))
+        d.line(orbit1_pts + [orbit1_pts[0]], fill=(0, 240, 255, 90), width=2)
+        
+        # Planet 1 position
+        a1 = t * 2.2
+        p1x, p1y, s1 = project_3d(140 * m.cos(a1), 50 * m.sin(a1), 140 * m.sin(a1))
+        r1 = max(4, int(12 * s1))
+        d.ellipse((p1x-r1-4, p1y-r1-4, p1x+r1+4, p1y+r1+4), fill=(0, 240, 255, 100))
+        d.ellipse((p1x-r1, p1y-r1, p1x+r1, p1y+r1), fill=C_CYAN)
+        
+        # 3D Orbit 2 (Magenta Outer Planet)
+        orbit2_pts = []
+        for deg in range(0, 360, 10):
+            rad = m.radians(deg)
+            ox = 250 * m.cos(rad)
+            oy = 90 * m.sin(rad)
+            oz = 250 * m.sin(rad)
+            px, py, _ = project_3d(ox, oy, oz)
+            orbit2_pts.append((px, py))
+        d.line(orbit2_pts + [orbit2_pts[0]], fill=(255, 60, 140, 90), width=2)
+        
+        a2 = t * 0.9
+        p2x, p2y, s2 = project_3d(250 * m.cos(a2), 90 * m.sin(a2), 250 * m.sin(a2))
+        r2 = max(4, int(15 * s2))
+        d.ellipse((p2x-r2-4, p2y-r2-4, p2x+r2+4, p2y+r2+4), fill=(255, 60, 140, 100))
+        d.ellipse((p2x-r2, p2y-r2, p2x+r2, p2y+r2), fill=C_MAGENTA)
+        
+    elif k == 'echo':
+        # 3D Sound Radar & Acoustic Cliff
+        # 3D Cliff
+        for cz in range(-120, 120, 20):
+            cx1, cy1, _ = project_3d(180, -90, cz)
+            cx2, cy2, _ = project_3d(180, 90, cz)
+            d.line((cx1, cy1, cx2, cy2), fill=C_GOLD, width=4)
+        
+        # 3D Source
+        ex, ey, _ = project_3d(-180, 0, 0)
+        d.ellipse((ex-15, ey-15, ex+15, ey+15), fill=C_CYAN)
+        
+        # 3D Volumetric Echo Waves
+        for offset in [0.0, 0.33, 0.66]:
+            cp = (p + offset) % 1.0
+            wx = -180 + 360 * (1 - abs(2 * cp - 1))
+            w_pts = []
+            for deg in range(0, 360, 20):
+                rad = m.radians(deg)
+                r_3d = 30 + 50 * m.sin(cp * m.pi)
+                ry = r_3d * m.sin(rad)
+                rz = r_3d * m.cos(rad)
+                px, py, _ = project_3d(wx, ry, rz)
+                w_pts.append((px, py))
+            col = C_CYAN if (2*cp) < 1 else C_GOLD
+            d.line(w_pts + [w_pts[0]], fill=(*col[:3], 160), width=2)
+            
+    else:
+        # 3D Rotating Gyroscopic Physics Ring
+        for ring_idx, (r_sz, c_col, speed) in enumerate([(140, C_CYAN, 1.4), (190, C_GOLD, 0.9), (80, C_MINT, 2.0)]):
+            ring_pts = []
+            for deg in range(0, 360, 12):
+                rad = m.radians(deg)
+                # 3D rotation matrix
+                rx = r_sz * m.cos(rad)
+                ry = r_sz * m.sin(rad) * m.cos(t * speed + ring_idx)
+                rz = r_sz * m.sin(rad) * m.sin(t * speed + ring_idx)
+                px, py, _ = project_3d(rx, ry, rz)
+                ring_pts.append((px, py))
+            d.line(ring_pts + [ring_pts[0]], fill=c_col, width=3)
+            # 3D Nodes
+            nodex, nodey, _ = ring_pts[int((t * 10) % len(ring_pts))]
+            d.ellipse((nodex-6, nodey-6, nodex+6, nodey+6), fill=C_TEXT_WHITE)
+
+# 4. Master Composite Animation Pipeline
+print("Encoding video...")
+p = sp.Popen([
+    'ffmpeg', '-loglevel', 'error', '-y',
+    '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}', '-r', str(FPS),
+    '-i', '-', '-i', str(out / 'voice.wav'),
+    '-c:v', 'libx264', '-threads', '2', '-preset', 'veryfast', '-crf', '20',
+    '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-movflags', '+faststart',
+    str(out / 'short.mp4')
+], stdin=sp.PIPE)
+
 step_names = ['OBSERVATION', 'ANALYSIS', 'THE MECHANISM', 'KEY TAKEAWAY']
 
 for j, ((text, label), frames) in enumerate(zip(beats, parts)):
-    card = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-    d = ImageDraw.Draw(card)
+    card_bg = base_bg.copy()
+    c_draw = ImageDraw.Draw(card_bg)
 
-    # Top Brand Badge
-    d.rounded_rectangle((48, 50, 215, 88), radius=18, fill=(15, 25, 45, 220), outline=(0, 240, 255), width=1)
-    d.text((64, 57), "THOUGHT LAB", font=badge_f, fill=(0, 240, 255))
-    d.text((235, 57), f"•  EPISODE #{n+1:03}", font=tag_f, fill=(180, 200, 230))
-
-    # Title
-    for i, line in enumerate(wrap(d, title, head_f, 620)):
-        d.text((48, 118 + i * 50), line, font=head_f, fill=(245, 248, 255))
+    # Stage Badge
+    c_draw.rounded_rectangle((60, 360, 310, 400), radius=10, fill=(20, 35, 65))
+    c_draw.text((74, 368), f"STAGE 0{j+1} • {label.upper()}", font=tag_f, fill=C_CYAN)
 
     # Bottom Subtitle Card
-    d.rounded_rectangle((38, 870, 682, 1160), radius=26, fill=(10, 16, 30, 230), outline=(45, 75, 125, 180), width=2)
-    d.text((62, 890), f"PHASE {j+1}: {step_names[j]}", font=tag_f, fill=(255, 200, 80))
+    c_draw.rounded_rectangle((38, 860, 682, 1150), radius=26, fill=(14, 22, 40), outline=C_CARD_BORDER, width=2)
+    c_draw.text((62, 880), f"PHASE {j+1}: {step_names[j]}", font=tag_f, fill=C_GOLD)
 
-    body_lines = wrap(d, text, body_f, 600)
+    body_lines = wrap(c_draw, text, body_f, 600)
     for i, l in enumerate(body_lines):
-        d.text((62, 935 + i * 44), l, font=body_f, fill=(245, 248, 255))
+        c_draw.text((62, 925 + i * 44), l, font=body_f, fill=C_TEXT_WHITE)
 
-    # Top Instagram-style progress bar
+    # Instagram Progress Bar
     bar_w = (W - 96 - 30) / 4
     for idx in range(4):
         bx = 48 + idx * (bar_w + 10)
-        d.rounded_rectangle((bx, 28, bx + bar_w, 34), radius=3, fill=(40, 60, 95, 200))
+        c_draw.rounded_rectangle((bx, 28, bx + bar_w, 34), radius=3, fill=(40, 60, 95))
         if idx <= j:
-            d.rounded_rectangle((bx, 28, bx + bar_w, 34), radius=3, fill=(0, 240, 255))
+            c_draw.rounded_rectangle((bx, 28, bx + bar_w, 34), radius=3, fill=C_CYAN)
 
     for f in range(frames):
-        frame_idx = sum(parts[:j]) + f
-        card.save(overlay_dir / f'overlay_{frame_idx:05d}.png')
+        im = card_bg.copy()
+        scene_draw = ImageDraw.Draw(im)
+        scene_3d(scene_draw, j, (sum(parts[:j]) + f) / FPS)
+        p.stdin.write(im.tobytes())
 
-# 4. Final Composite: Blender 3D Video + Overlay PNG Sequence + Voice
-print("Compositing 3D Video + UI + Audio with FFmpeg...")
-final_output = out / 'short.mp4'
-
-ffmpeg_composite = [
-    'ffmpeg', '-loglevel', 'error', '-y',
-    '-framerate', str(FPS),
-    '-i', str(frames_dir / 'f_%04d.png'),
-    '-framerate', str(FPS),
-    '-i', str(overlay_dir / 'overlay_%05d.png'),
-    '-i', str(out / 'voice.wav'),
-    '-filter_complex', '[0:v][1:v]overlay=0:0[v]',
-    '-map', '[v]',
-    '-map', '2:a',
-    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20',
-    '-pix_fmt', 'yuv420p', '-c:a', 'aac',
-    '-movflags', '+faststart',
-    str(final_output)
-]
-sp.run(ffmpeg_composite, check=True)
+p.stdin.close()
+assert p.wait() == 0
 
 meta = {
     'title': f'{title} | Lab {n+1:03}',
-    'description': ' '.join(x[0] for x in beats) + '\n\nOriginal cinematic 3D explainer rendered with Blender Eevee engine. #Shorts #Blender3D #Science',
+    'description': ' '.join(x[0] for x in beats) + '\n\nOriginal 3D perspective explainer. #Shorts #Science #Physics',
     'episode': n
 }
 (out / 'meta.json').write_text(json.dumps(meta, indent=2))
-print("Finished rendering Short:", meta['title'], f"{total_frames/FPS:.1f}s")
+print("Finished rendering Short:", meta['title'])
