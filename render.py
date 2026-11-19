@@ -83,11 +83,11 @@ def scene(d, b, t):
         ring(355, 590, r); line((355, 590, 355 + R, 590), gold, 4); dot(355, 590, 5, gold)
 
 async def synthesize_all():
-    voice = 'en-US-ChristopherNeural' # Natural human male English
+    voice = 'en-US-GuyNeural' # Deep cinematic documentary narrator
     for j, (text, label) in enumerate(beats):
         mp3_path = str(out / f'line_{j}.mp3')
         wav_path = str(out / f'line_{j}.wav')
-        tts = edge_tts.Communicate(text, voice)
+        tts = edge_tts.Communicate(text, voice, pitch="-8Hz", rate="-3%")
         await tts.save(mp3_path)
         sp.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', mp3_path, '-ar', '24000', '-ac', '1', wav_path], check=True)
 
