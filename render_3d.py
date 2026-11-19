@@ -194,4 +194,3 @@ else:
 print(f"--- STARTING BLENDER 3D RENDER ({total_frames} frames) ---")
 bpy.ops.render.render(animation=True)
 print("--- BLENDER 3D RENDER COMPLETE ---")
-                      
