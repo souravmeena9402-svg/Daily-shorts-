@@ -20,7 +20,13 @@ output_video_path = args[3] if len(args) > 3 else "output/scene3d.mp4"
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
 scene = bpy.context.scene
-scene.render.engine = 'BLENDER_EEVEE_NEXT' if hasattr(bpy.types, 'RenderEngine') and 'BLENDER_EEVEE_NEXT' in [e.identifier for e in bpy.types.RenderEngine.bl_rna.properties['engine'].enum_items] else 'BLENDER_EEVEE'
+try:
+    scene.render.engine = 'BLENDER_EEVEE_NEXT'
+except Exception:
+    try:
+        scene.render.engine = 'BLENDER_EEVEE'
+    except Exception:
+        scene.render.engine = 'CYCLES'
 scene.render.resolution_x = 720
 scene.render.resolution_y = 1280
 scene.render.resolution_percentage = 100
