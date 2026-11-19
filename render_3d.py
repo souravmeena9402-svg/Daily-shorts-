@@ -20,13 +20,9 @@ output_video_path = args[3] if len(args) > 3 else "output/scene3d.mp4"
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
 scene = bpy.context.scene
-try:
-    scene.render.engine = 'BLENDER_EEVEE_NEXT'
-except Exception:
-    try:
-        scene.render.engine = 'BLENDER_EEVEE'
-    except Exception:
-        scene.render.engine = 'CYCLES'
+scene.render.engine = 'CYCLES'
+scene.cycles.device = 'CPU'
+scene.cycles.samples = 16 # Fast clean render for cloud VM
 scene.render.resolution_x = 720
 scene.render.resolution_y = 1280
 scene.render.resolution_percentage = 100
