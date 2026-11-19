@@ -34,13 +34,9 @@ scene.render.fps = 24
 scene.frame_start = 1
 scene.frame_end = total_frames
 
-# Video output settings
-scene.render.image_settings.file_format = 'FFMPEG'
-scene.render.ffmpeg.format = 'MPEG4'
-scene.render.ffmpeg.codec = 'H264'
-scene.render.ffmpeg.constant_rate_factor = 'MEDIUM'
-scene.render.ffmpeg.ffmpeg_preset = 'VERYFAST'
-scene.render.filepath = output_video_path
+# Image frame sequence settings (100% reliable across all Blender headless builds)
+scene.render.image_settings.file_format = 'PNG'
+scene.render.filepath = args[3] if len(args) > 3 else "output/frames/f_"
 
 # World Dark Deep Space Background
 world = bpy.data.worlds.new("SpaceWorld")
