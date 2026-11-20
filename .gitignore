@@ -1,0 +1,15 @@
+output/
+__pycache__/
+*.pyc
+.DS_Store
+client_secret*.json
+
+# Blender artifacts – never commit binary files
+*.blend
+*.blend1
+*.blend2
+blender-*.tar.*
+blender-*.dmg
+blender-*.msi
+frames/
+preview.mp4

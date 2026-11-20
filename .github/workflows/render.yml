@@ -1,0 +1,71 @@
+name: 🎬 Blender Render
+
+on:
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: "Cycles samples (lower = faster)"
+        required: false
+        default: "32"
+
+jobs:
+  render:
+    name: Render Rotating Cube
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ── Checkout repo ───────────────────────────────────────────
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Install Blender & FFmpeg ────────────────────────────────
+      - name: 🔧 Install Blender & FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq snapd ffmpeg
+          sudo snap install blender --classic
+          echo "--- Blender version ---"
+          blender --version
+          echo "--- FFmpeg version ---"
+          ffmpeg -version | head -1
+
+      # ── Run Blender headless render ─────────────────────────────
+      - name: 🎨 Render frames with Blender (Cycles CPU)
+        run: |
+          blender --background --python create_scene.py
+
+      # ── Verify rendered frames ──────────────────────────────────
+      - name: ✅ Verify rendered frames
+        run: |
+          FRAME_COUNT=$(ls -1 frames/frame_*.png 2>/dev/null | wc -l)
+          echo "Rendered frames: $FRAME_COUNT"
+          if [ "$FRAME_COUNT" -lt 72 ]; then
+            echo "❌ Expected 72 frames, got $FRAME_COUNT"
+            exit 1
+          fi
+          echo "✅ All 72 frames rendered successfully"
+
+      # ── Stitch frames into video with FFmpeg ────────────────────
+      - name: 🎞️ Create preview.mp4 from PNG frames
+        run: |
+          ffmpeg -y \
+            -framerate 24 \
+            -i frames/frame_%04d.png \
+            -c:v libx264 \
+            -pix_fmt yuv420p \
+            -crf 23 \
+            -preset fast \
+            -movflags +faststart \
+            preview.mp4
+          echo "--- Video info ---"
+          ffmpeg -i preview.mp4 2>&1 | grep -E "Duration|Stream"
+          ls -lh preview.mp4
+
+      # ── Upload artifact ─────────────────────────────────────────
+      - name: 📦 Upload preview.mp4 as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: blender-render-preview
+          path: preview.mp4
+          retention-days: 14
