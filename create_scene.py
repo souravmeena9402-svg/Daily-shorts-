@@ -4,7 +4,7 @@ Creates a rotating cube, camera, and lighting.
 Renders a 3-second 480p 24 FPS animation (Cycles CPU) to PNG frames.
 
 Usage:
-    blender --background --python create_scene.py
+    blender --background --python-exit-code 1 --python create_scene.py
 """
 
 import bpy
@@ -39,7 +39,7 @@ scene.render.engine = "CYCLES"
 prefs = bpy.context.preferences.addons["cycles"].preferences
 prefs.compute_device_type = "NONE"  # CPU only
 scene.cycles.device = "CPU"
-scene.cycles.samples = 32          # low for speed
+scene.cycles.samples = int(os.environ.get("CYCLES_SAMPLES") or "32")
 scene.cycles.use_denoising = True
 
 # ── World background ───────────────────────────────────────────────
@@ -68,12 +68,6 @@ cube.rotation_euler = (0, 0, 0)
 cube.keyframe_insert(data_path="rotation_euler", frame=1)
 cube.rotation_euler = (math.radians(360), 0, math.radians(360))
 cube.keyframe_insert(data_path="rotation_euler", frame=TOTAL_FRAMES)
-
-# Make rotation linear (no ease-in / ease-out)
-if cube.animation_data and cube.animation_data.action:
-    for fc in cube.animation_data.action.fcurves:
-        for kp in fc.keyframe_points:
-            kp.interpolation = "LINEAR"
 
 # ── Camera ──────────────────────────────────────────────────────────
 cam_data = bpy.data.cameras.new("Camera")

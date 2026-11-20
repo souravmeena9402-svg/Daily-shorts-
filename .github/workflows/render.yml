@@ -30,10 +30,11 @@ jobs:
           echo "--- FFmpeg version ---"
           ffmpeg -version | head -1
 
-      # ── Run Blender headless render ─────────────────────────────
       - name: 🎨 Render frames with Blender (Cycles CPU)
+        env:
+          CYCLES_SAMPLES: ${{ inputs.samples }}
         run: |
-          blender --background --python create_scene.py
+          blender --background --python-exit-code 1 --python create_scene.py
 
       # ── Verify rendered frames ──────────────────────────────────
       - name: ✅ Verify rendered frames
